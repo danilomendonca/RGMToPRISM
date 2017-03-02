@@ -40,7 +40,7 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.progress.IProgressService;
 
 import br.unb.cic.rtgoretoprism.generator.CodeGenerationException;
-import br.unb.cic.rtgoretoprism.generator.rtgore.RTGoreProducer;
+import br.unb.cic.rtgoretoprism.generator.goda.producer.RTGoreProducer;
 
 /**
  * This action let the user to start the process of generating agent code for
@@ -89,7 +89,7 @@ public class PRISMCodeGenerationAction extends AbstractCodeGeneractionAction {
 
 					try {*/
 						//generate the source code for the KL side
-						RTGoreProducer producer = new RTGoreProducer(selectedActors, selectedGoals, sourceFolder, targetFolder );
+						RTGoreProducer producer = new RTGoreProducer(selectedActors, selectedGoals, sourceFolder, targetFolder, false );
 						producer.run();
 					/*
 						//refresh workspace folder
@@ -119,14 +119,11 @@ public class PRISMCodeGenerationAction extends AbstractCodeGeneractionAction {
 		}
 	}
 	
-
-	@Override
 	public void dispose() {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
 	public void init(IWorkbenchWindow window) {
 		this.window = window;		
 	}
