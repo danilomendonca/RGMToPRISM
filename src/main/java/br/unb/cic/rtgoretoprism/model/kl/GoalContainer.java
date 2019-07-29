@@ -70,7 +70,7 @@ public class GoalContainer extends RTContainer{
 		parentlist = new ArrayList<GoalContainer>();
 		dependencies = new ArrayList<String[]>();
 		
-		this.setCreationCondition(goal.getCreationProperty());
+		this.addFulfillmentConditions(goal.getCreationProperty());
 	}
 
 	/**
@@ -160,5 +160,10 @@ public class GoalContainer extends RTContainer{
 	 */
 	public String getDependumGoalFromDependency(String[] dep) {
 		return dep[0];
+	}
+	
+	public void setRoot(RTContainer root){
+		super.setRoot(root);
+		setUid(super.getElId());
 	}
 }

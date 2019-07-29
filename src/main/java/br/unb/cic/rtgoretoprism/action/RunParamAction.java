@@ -30,32 +30,15 @@
 
 package br.unb.cic.rtgoretoprism.action;
 
-import it.itc.sra.taom4e.model.core.informalcore.Actor;
-import it.itc.sra.taom4e.model.core.informalcore.formalcore.FHardGoal;
-
-import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.util.Date;
+import java.io.IOException;
 
 import org.eclipse.core.resources.IFolder;
-import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jface.action.IAction;
-import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.operation.IRunnableWithProgress;
-import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.IWorkbenchWindow;
-import org.eclipse.ui.PlatformUI;
-import org.eclipse.ui.console.MessageConsole;
-import org.eclipse.ui.console.MessageConsoleStream;
-import org.eclipse.ui.progress.IProgressService;
-import org.troposproject.util.ProcessCallback;
-import org.troposproject.util.Spawn;
 
-import br.unb.cic.rtgoretoprism.RTGoreToPrismPlugin;
-import br.unb.cic.rtgoretoprism.console.ConsoleUtil;
-import br.unb.cic.rtgoretoprism.generator.kl.AgentDefinition;
-import br.unb.cic.rtgoretoprism.util.FileUtility;
+import br.unb.cic.rtgoretoprism.generator.CodeGenerationException;
+import br.unb.cic.rtgoretoprism.generator.goda.producer.PARAMProducer;
 
 /**
  * This class allow the user to launch the selected agent (KL) into an (already 
@@ -95,113 +78,28 @@ public class RunParamAction extends AbstractCodeGeneractionAction{
 	 * @see org.eclipse.ui.IActionDelegate#run(org.eclipse.jface.action.IAction)
 	 */
     public void run(IAction action) {
-    	//get current shell
-    	//Shell shell = targetPart.getSite().getShell();
     	
     	//update input/output folders values
     	updateUsedFolders();
-    	
-        //create a long-running op for the code generation process
-        IWorkbench wb = PlatformUI.getWorkbench();
-        IProgressService ps = wb.getProgressService();
-
-    	try {
-			ps.busyCursorWhile(new RunnableWithProgressCallback());
-		} catch (InvocationTargetException | InterruptedException e) {
+		
+        /* Generating PCTL and PARAM formulas */
+		try {
+			PARAMProducer producer = new PARAMProducer(selectedActors, selectedGoals, sourceFolder, targetFolder, toolsFolder);
+			producer.run();
+		} catch (CodeGenerationException | IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
     }
-
-	@Override
-	public void dispose() {
-		// TODO Auto-generated method stub
-		
-	}
 
 	@Override
 	public void init(IWorkbenchWindow window) {
 		this.window = window;		
 	}
-	
-	class RunnableWithProgressCallback implements IRunnableWithProgress, ProcessCallback{
-		
-		IProgressMonitor monitor;
-		long startTime;		
-		String goals;		
-		
-		public void run( IProgressMonitor monitor )
-				throws InvocationTargetException, InterruptedException {
-			
-			this.monitor = monitor;
-			
-			//get the path to the Jadex library directory
-	    	String bx = RTGoreToPrismPlugin.getDefault().getPluginPreferences().
-	    		getString( RTGoreToPrismPlugin.JADEX_BASE_PATH ) + "/"; 
-			
-			//show user that work is progressing
-			monitor.beginTask("Generating PARAM formulas", IProgressMonitor.UNKNOWN );
 
-	    	for(Actor actor : selectedActors){
-		    	try {
-		    		//Note: this should be generalized
-		    		//String folderName = selectedFolder.getName();
-		    		
-		    		//we expect something like BASIC_AGENT_PACKAGE_PREFIX_XXX
-		    		//get the name of the agent to be started
-		    		//String agentName = folderName.substring( PathLocation.BASIC_AGENT_PACKAGE_PREFIX.length() );
-		    		String agentName = actor.getName().replaceAll("\n", "_");			    						
-		    		
-		    		StringBuilder pctl = new StringBuilder("P=? [ true U (");
-		    		StringBuilder goals = new StringBuilder();
-		    		int i = 0;
-		    		for(FHardGoal goal : selectedGoals){
-		    			pctl.append(AgentDefinition.parseElId(goal.getName()) + (i < selectedGoals.size() - 1 ? "&" : ""));
-		    			goals.append(AgentDefinition.parseElId(goal.getName()));
-		    			i++;
-		    		}
-		    		pctl.append(") ]");
-		    		FileUtility.writeFile(pctl.toString(), bx + "reachability.pctl");
-		    		this.goals = goals.toString();
-		    		
-					String cmd = "./param-2-2-64";
-					String arg1 = agentName + ".pm";
-					String arg2 = "reachability.pctl";		
-					String arg3 = "--result-file";
-					String arg4 = goals.toString();
-					
-					//get the output console for this agent
-					MessageConsole myConsole = ConsoleUtil.findConsole( agentName );
-					MessageConsoleStream out = myConsole.newMessageStream();
+	@Override
+	public void dispose() {
+		// TODO Auto-generated method stub
 		
-					//run the process
-					startTime = new Date().getTime();
-					Spawn spawn = new Spawn( new File(bx), out, out, this, new String[]{cmd, arg1, arg2, arg3, arg4});
-					spawn.start();
-					
-					//remove the temporary pctl formula
-					FileUtility.deleteFile(bx + "reachability.pctl");
-		    	}
-		    	catch (Exception e ) {
-		    		MessageDialog.openError( shell, "Error starting PARAM for the selected Actor", e.toString() );
-		    	}
-	    	}
-		}
-		
-		@Override
-		public void runAfterExit(int exitStatus) {
-			
-			if(exitStatus == 0){
-				String bx = RTGoreToPrismPlugin.getDefault().getPluginPreferences().
-			    		getString( RTGoreToPrismPlugin.JADEX_BASE_PATH ) + "/"; 
-				//close the monitor
-				monitor.done();
-				System.out.println("PARAM Formula created, exit status: " + exitStatus); 
-				System.out.println("Goal(s): " + this.goals + "\t\t\tTime: " + (new Date().getTime() - this.startTime) + "\t\tSize: " + FileUtility.fileSize(bx + this.goals + ".out"));
-			}else{
-				System.out.println("Error generating PARAM Formula " + this.goals);
-			}
-		}
 	}
 }
